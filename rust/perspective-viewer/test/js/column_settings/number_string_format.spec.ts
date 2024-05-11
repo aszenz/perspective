@@ -10,16 +10,9 @@
 // ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-import { Type } from "@finos/perspective";
-import {
-    DEFAULT_CONFIG,
-    PageView,
-    compareContentsToSnapshot,
-} from "@finos/perspective-test";
-import { ColumnSelector } from "@finos/perspective-test/src/js/models/settings_panel";
+import { PageView, compareContentsToSnapshot } from "@finos/perspective-test";
 import { test, expect } from "@finos/perspective-test";
-import { DataGridPlugin } from "@finos/perspective-test/src/js/models/plugins";
-import { DataGrid } from "@finos/perspective-test/src/js/models/plugins/datagrid";
+import { DataGrid } from "@finos/perspective-test/src/js/models/plugins/datagrid.ts";
 
 test.beforeEach(async ({ page }) => {
     await page.goto("/tools/perspective-test/src/html/basic-test.html");
@@ -137,18 +130,18 @@ test("Datagrid integration", async ({ page }) => {
     const view = new PageView(page);
     const datagrid = new DataGrid(page);
     await view.restore({
-        plugin: "Datagrid",
-        columns: ["Profit"],
-        columns_config: {
-            Profit: {
-                number_format: {
-                    minimumIntegerDigits: 3,
-                    maximumFractionDigits: 0,
-                    roundingIncrement: 50,
-                    roundingMode: "ceil",
-                    notation: "compact",
-                    compactDisplay: "short",
-                    signDisplay: "always",
+        "plugin": "Datagrid",
+        "columns": ["Profit"],
+        "columns_config": {
+            "Profit": {
+                "number_format": {
+                    "minimumIntegerDigits": 3,
+                    "maximumFractionDigits": 0,
+                    "roundingIncrement": 50,
+                    "roundingMode": "ceil",
+                    "notation": "compact",
+                    "compactDisplay": "short",
+                    "signDisplay": "always",
                 },
             },
         },

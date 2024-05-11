@@ -14,7 +14,9 @@ const { test } = require("@finos/perspective-test");
 import { compareContentsToSnapshot } from "@finos/perspective-test";
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/@finos/perspective-jupyterlab/test/html/resize.html");
+    await page.goto(
+        "/node_modules/@finos/perspective-jupyterlab/test/html/resize.html"
+    );
     await page.evaluate(async () => {
         while (!window["__TEST_PERSPECTIVE_READY__"]) {
             await new Promise((x) => setTimeout(x, 10));
