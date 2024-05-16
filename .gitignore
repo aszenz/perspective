@@ -223,3 +223,4 @@ testenv
 .clangd
 .llvm/
 examples/blocks/src/nypd/nypdccrb.arrow
+rust/perspective-viewer/rust/perspective-viewer/target

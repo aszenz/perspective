@@ -51,7 +51,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 pub async fn test_view_to_csv() {
     let table = get_mock_table().await;
     let view = table.view(json!({}).unchecked_ref()).await.unwrap();
-    let csv: String = view.to_csv(json!({})).await.unwrap().into();
+    let csv: String = view.to_csv(None).await.unwrap().into();
     assert_eq!(csv, "\"A\"\n1\n2\n3\n");
 }
 

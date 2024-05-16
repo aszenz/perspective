@@ -11,6 +11,7 @@
 // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 use itertools::Itertools;
+use js_sys::JsString;
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -41,6 +42,12 @@ macro_rules! async_typed {
 #[wasm_bindgen]
 #[rustfmt::skip]
 extern "C" {
+
+    #[derive(Clone)]
+    pub type JsViewWindow;
+
+    #[wasm_bindgen(method, setter)]
+    pub fn set_formatted(this: &JsViewWindow, x: bool);
 
     #[derive(Clone)]
     pub type JsPerspectiveWorker;
@@ -93,17 +100,19 @@ extern "C" {
     #[wasm_bindgen(method, catch, js_name = to_csv)]
     pub async fn _to_csv(
         this: &JsPerspectiveView,
-        options: js_sys::Object,
+        options: Option<JsViewWindow>,
     ) -> ApiResult<JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = to_arrow)]
     pub async fn _to_arrow(
         this: &JsPerspectiveView,
+        options: Option<JsViewWindow>,
     ) -> ApiResult<JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = to_columns)]
     pub async fn _to_columns(
         this: &JsPerspectiveView,
+        options: Option<JsViewWindow>,
     ) -> ApiResult<JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = dimensions)]
@@ -177,17 +186,27 @@ impl JsPerspectiveTable {
 }
 
 impl JsPerspectiveView {
-    async_typed!(_to_csv, to_csv(&self, options: js_sys::Object) -> js_sys::JsString);
+    async_typed!(_to_arrow, to_arrow(&self, options: Option<JsViewWindow>) -> js_sys::ArrayBuffer);
 
-    async_typed!(_to_arrow, to_arrow(&self) -> js_sys::ArrayBuffer);
+    async_typed!(_to_columns, to_columns(&self, options: Option<JsViewWindow>) -> js_sys::Object);
 
-    async_typed!(_to_columns, to_columns(&self) -> js_sys::Object);
+    async_typed!(
+        _to_csv,
+        to_csv(&self, options: Option<JsViewWindow>) -> JsString
+    );
 
     async_typed!(_dimensions, dimensions(&self) ->  JsPerspectiveViewDimensions);
 
     async_typed!(_schema, schema(&self) -> JsPerspectiveViewSchema);
 
     async_typed!(_delete, delete(self) -> ());
+
+    // pub async fn to_csv(
+    //     &self,
+    //     options: Option<JsViewWindow>,
+    // ) -> Result<js_sys::JsString, ApiError> { let fut = self._to_csv(options);
+    //   Ok(fut.await?.unchecked_into::<js_sys::JsString>())
+    // }
 
     pub async fn get_min_max(&self, col: &str) -> ApiResult<(f64, f64)> {
         let vec = self

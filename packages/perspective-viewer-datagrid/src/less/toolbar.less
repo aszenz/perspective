@@ -51,19 +51,51 @@
 }
 
 #edit_mode:before {
-    -webkit-mask-image: var(--toolbar-edit-mode--content);
+    -webkit-mask-image: "";
 }
 
-#edit_mode.editable:before {
-    -webkit-mask-image: var(--toolbar-edit-mode-active--content);
+#edit_mode[data-edit-mode="READ_ONLY"]:before {
+    -webkit-mask-image: var(--toolbar-edit-mode--read-only--content);
 }
 
-#edit_mode span:before {
-    content: var(--edit-mode-toggle--content, "Read Only");
+#edit_mode[data-edit-mode="EDIT"]:before {
+    -webkit-mask-image: var(--toolbar-edit-mode--edit--content);
 }
 
-#edit_mode.editable span:before {
-    content: var(--edit-mode-alt-toggle--content, "Editable");
+#edit_mode[data-edit-mode="SELECT_ROW"]:before {
+    -webkit-mask-image: var(--toolbar-edit-mode--select-row--content);
+}
+
+#edit_mode[data-edit-mode="SELECT_COLUMN"]:before {
+    -webkit-mask-image: var(--toolbar-edit-mode--select-column--content);
+}
+
+#edit_mode[data-edit-mode="SELECT_REGION"]:before {
+    -webkit-mask-image: var(--toolbar-edit-mode--select-region--content);
+}
+
+// #edit_mode span:before {
+//     content: var(--edit-mode-toggle--content, "N/A");
+// }
+
+#edit_mode[data-edit-mode="READ_ONLY"] span:before {
+    content: var(--edit-mode--read-only--content, "Read Only");
+}
+
+#edit_mode[data-edit-mode="EDIT"] span:before {
+    content: var(--edit-mode--edit--content, "Editable");
+}
+
+#edit_mode[data-edit-mode="SELECT_ROW"] span:before {
+    content: var(--edit-mode--select-row--content, "Row Select");
+}
+
+#edit_mode[data-edit-mode="SELECT_COLUMN"] span:before {
+    content: var(--edit-mode--select-column--content, "Column Select");
+}
+
+#edit_mode[data-edit-mode="SELECT_REGION"] span:before {
+    content: var(--edit-mode--select-region--content, "Region Select");
 }
 
 #scroll_lock span:before {
@@ -79,7 +111,7 @@
 }
 
 .button:before {
-    width: 25px;
+    width: 21px;
     height: 21px;
     content: "";
     -webkit-mask-image: cover;

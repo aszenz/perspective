@@ -59,8 +59,9 @@ export function restore(token, columns) {
         }
     }
 
+    // TODO this is going away.
     if ("editable" in token) {
-        toggle_edit_mode.call(this, token.editable);
+        toggle_edit_mode.call(this, token.editable ? "EDIT" : "READ_ONLY");
     }
 
     if ("scroll_lock" in token) {

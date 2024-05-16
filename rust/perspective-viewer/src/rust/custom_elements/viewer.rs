@@ -10,6 +10,8 @@
 // ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
+#![allow(non_snake_case)]
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -307,7 +309,7 @@ impl PerspectiveViewerElement {
         let session = self.session.clone();
         ApiFuture::new(async move {
             let val = session
-                .csv_as_jsvalue(flat.unwrap_or_default())
+                .csv_as_jsvalue(flat.unwrap_or_default(), None)
                 .await?
                 .as_blob()?;
             download("untitled.csv", &val)
@@ -405,6 +407,17 @@ impl PerspectiveViewerElement {
         } else {
             *self.intersection_handle.borrow_mut() = None;
         }
+    }
+
+    #[wasm_bindgen(js_name = "getSelection")]
+    pub fn get_selection(&self) -> Option<JsViewWindow> {
+        self.renderer.get_selection()
+    }
+
+    #[wasm_bindgen(js_name = "setSelection")]
+    pub fn set_selection(&self, window: Option<JsViewWindow>) -> ApiResult<()> {
+        self.renderer.set_selection(window);
+        Ok(())
     }
 
     /// Get this viewer's edit port for the currently loaded `Table`.

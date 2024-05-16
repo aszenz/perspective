@@ -257,24 +257,34 @@ impl Session {
     }
 
     pub async fn arrow_as_vec(&self, flat: bool) -> Result<Vec<u8>, JsValue> {
-        let arrow = self.flat_as_jsvalue(flat).await?.to_arrow().await?;
+        let arrow = self.flat_as_jsvalue(flat).await?.to_arrow(None).await?;
         Ok(js_sys::Uint8Array::new(&arrow).to_vec())
     }
 
-    pub async fn arrow_as_jsvalue(self, flat: bool) -> Result<js_sys::ArrayBuffer, ApiError> {
-        self.flat_as_jsvalue(flat).await?.to_arrow().await
+    pub async fn arrow_as_jsvalue(
+        self,
+        flat: bool,
+        window: Option<JsViewWindow>,
+    ) -> Result<js_sys::ArrayBuffer, ApiError> {
+        self.flat_as_jsvalue(flat).await?.to_arrow(window).await
     }
 
-    pub async fn json_as_jsvalue(self, flat: bool) -> Result<js_sys::Object, ApiError> {
-        self.flat_as_jsvalue(flat).await?.to_columns().await
+    pub async fn json_as_jsvalue(
+        self,
+        flat: bool,
+        window: Option<JsViewWindow>,
+    ) -> Result<js_sys::Object, ApiError> {
+        self.flat_as_jsvalue(flat).await?.to_columns(window).await
     }
 
-    pub async fn csv_as_jsvalue(&self, flat: bool) -> Result<js_sys::JsString, ApiError> {
-        let opts = json!({"formatted": true});
-        self.flat_as_jsvalue(flat)
-            .await?
-            .to_csv(opts.unchecked_into())
-            .await
+    pub async fn csv_as_jsvalue(
+        &self,
+        flat: bool,
+        window: Option<JsViewWindow>,
+    ) -> Result<js_sys::JsString, ApiError> {
+        let window = window.unwrap_or_else(|| json!({}).unchecked_into());
+        window.set_formatted(true);
+        self.flat_as_jsvalue(flat).await?.to_csv(Some(window)).await
     }
 
     pub fn get_view(&self) -> Option<View> {
@@ -315,7 +325,7 @@ impl Session {
         let table = self.borrow().table.clone().unwrap();
         let view = table.view(&js_config).await?;
         let csv = view
-            .to_csv(json!({}))
+            .to_csv(None)
             .await?
             .as_string()
             .ok_or_else(|| JsValue::from("Bad CSV"))?;

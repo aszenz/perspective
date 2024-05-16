@@ -66,8 +66,6 @@ pub struct StatusBar {
     themes: Vec<String>,
     export_ref: NodeRef,
     copy_ref: NodeRef,
-    export_dropdown: Option<ExportDropDownMenuElement>,
-    copy_dropdown: Option<CopyDropDownMenuElement>,
     _sub: [Subscription; 5],
 }
 
@@ -112,9 +110,7 @@ impl Component for StatusBar {
             _sub,
             theme: None,
             themes: vec![],
-            copy_dropdown: None,
             copy_ref: NodeRef::default(),
-            export_dropdown: None,
             export_ref: NodeRef::default(),
             is_updating: 0,
         }
@@ -154,16 +150,12 @@ impl Component for StatusBar {
             },
             StatusBarMsg::Export => {
                 let target = self.export_ref.cast::<HtmlElement>().unwrap();
-                self.export_dropdown
-                    .get_or_insert_with(|| ExportDropDownMenuElement::new_from_model(ctx.props()))
-                    .open(target);
+                ExportDropDownMenuElement::new_from_model(ctx.props()).open(target);
                 false
             },
             StatusBarMsg::Copy => {
                 let target = self.copy_ref.cast::<HtmlElement>().unwrap();
-                self.copy_dropdown
-                    .get_or_insert_with(|| CopyDropDownMenuElement::new_from_model(ctx.props()))
-                    .open(target);
+                CopyDropDownMenuElement::new_from_model(ctx.props()).open(target);
                 false
             },
             StatusBarMsg::SetTitle(title) => {

@@ -69,6 +69,7 @@ pub struct RendererMutData {
     plugin_store: PluginStore,
     plugins_idx: Option<usize>,
     timer: MovingWindowRenderTimer,
+    selection: Option<JsViewWindow>,
 }
 
 type RenderLimits = (usize, usize, Option<usize>, Option<usize>);
@@ -111,6 +112,7 @@ impl Renderer {
                 metadata: ViewConfigRequirements::default(),
                 plugin_store: PluginStore::default(),
                 plugins_idx: None,
+                selection: None,
                 timer: MovingWindowRenderTimer::default(),
             }),
             draw_lock: Default::default(),
@@ -186,6 +188,14 @@ impl Renderer {
 
     pub fn set_throttle(&self, val: Option<f64>) {
         self.0.borrow_mut().timer.set_throttle(val);
+    }
+
+    pub fn set_selection(&self, window: Option<JsViewWindow>) {
+        self.borrow_mut().selection = window
+    }
+
+    pub fn get_selection(&self) -> Option<JsViewWindow> {
+        self.borrow().selection.clone()
     }
 
     pub fn disable_active_plugin_render_warning(&self) {
