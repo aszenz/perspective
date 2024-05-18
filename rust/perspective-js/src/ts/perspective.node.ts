@@ -11,56 +11,30 @@
 // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 // @ts-ignore
-import perspective_server_wasm from "../../dist/pkg/node/perspective-server.wasm";
-
-// @ts-ignore
 import perspective_client_wasm from "../../dist/pkg/perspective-js.wasm";
 
-import perspective_server from "../../dist/pkg/node/perspective-server.js";
-import * as perspective_client from "../../dist/pkg/perspective-js.js";
-import { load_wasm_stage_0 } from "./decompress.js";
-import WebSocket from "ws";
-import fs from "fs";
-import stoppable from "stoppable";
-import http from "http";
-import path from "path";
-import url from "node:url";
-import { webcrypto } from "node:crypto";
-
-import type * as net from "node:net";
-import type { TableInitOptions } from "./ts-rs/TableInitOptions.js";
+// @ts-ignore
+import perspective_server_wasm from "../../dist/pkg/web/perspective-server.wasm";
 
 export type * from "../../dist/pkg/perspective-js.d.ts";
+export { PerspectiveServer } from "./engine.js";
+
+import * as perspective_client from "../../dist/pkg/perspective-js.js";
+import { load_wasm_stage_0 } from "./decompress.js";
+import WebSocket, { WebSocketServer as HttpWebSocketServer } from "ws";
+import stoppable from "stoppable";
+import { promises as fs } from "node:fs";
+import http from "node:http";
+import path from "node:path";
+import type * as net from "node:net";
+import type { TableInitOptions } from "./ts-rs/TableInitOptions.js";
+import { PerspectiveServer } from "./engine.js";
+import { compile_perspective } from "./emscripten_api.js";
+import { webcrypto } from "node:crypto";
 
 if (!globalThis.crypto) {
     globalThis.crypto = webcrypto as Crypto;
 }
-
-const __filename = url.fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-interface ProtoServer {
-    handle_message(
-        client_id: number,
-        req: Uint8Array,
-        callback: (client_id: number, resp: Uint8Array) => void
-    ): void;
-
-    poll(callback: (client_id: number, resp: Uint8Array) => void): void;
-}
-
-type PerspectiveModule = {
-    init(): void;
-    ProtoServer: { new (): ProtoServer };
-};
-
-declare module "../../dist/pkg/node/perspective-server.js" {
-    export default function __init(options: any): PerspectiveModule;
-}
-
-const wasmBinary = await load_wasm_stage_0(perspective_server_wasm);
-const core = await perspective_server({ wasmBinary });
-await core.init();
 
 const uncompressed_client_wasm = await load_wasm_stage_0(
     perspective_client_wasm as unknown as ArrayBuffer | Response
@@ -69,6 +43,23 @@ const uncompressed_client_wasm = await load_wasm_stage_0(
 await perspective_client.default(uncompressed_client_wasm);
 await perspective_client.init();
 
+const SYNC_MODULE = await compile_perspective(perspective_server_wasm);
+let SYNC_CLIENT: perspective_client.JsClient;
+const SYNC_SERVER = new PerspectiveServer(SYNC_MODULE);
+const SYNC_SESSION = SYNC_SERVER.make_session((resp) => {
+    SYNC_CLIENT.handle_message(resp);
+});
+
+SYNC_CLIENT = new perspective_client.JsClient((req: Uint8Array) => {
+    SYNC_SESSION.handle_message(req);
+    setTimeout(() => SYNC_SESSION.poll());
+});
+
+await SYNC_CLIENT.init();
+
+export const make_sync_session = (cb: (buffer: Uint8Array) => void) =>
+    SYNC_SERVER.make_session(cb);
+
 // Helper function to create client emitter/receiver pairs
 export function make_client(
     callback: (buffer: Uint8Array) => void,
@@ -76,63 +67,6 @@ export function make_client(
 ) {
     return new perspective_client.JsClient(callback, close);
 }
-
-function invert_promise<T>(): [(t: T) => void, Promise<T>] {
-    let sender: ((t: T) => void) | undefined = undefined;
-    let receiver: Promise<T> = new Promise((x) => {
-        sender = x;
-    });
-
-    return [sender!, receiver];
-}
-
-const PROTO_SERVER = new core.ProtoServer();
-const CLIENTS: Map<number, (buffer: Uint8Array) => void> = new Map();
-const ID_GEN = { id: 0 };
-
-interface PerspectiveServer {
-    handle_message(buffer: Uint8Array): void;
-}
-
-// Helper function to create server emitter/receiver pairs
-export function make_server(
-    callback: (buffer: Uint8Array) => void
-): PerspectiveServer {
-    const client_id = ID_GEN.id++;
-    CLIENTS.set(client_id, callback);
-    return {
-        handle_message(req: Uint8Array) {
-            PROTO_SERVER.handle_message(
-                client_id,
-                req,
-                (client_id: number, resp: Uint8Array) => {
-                    CLIENTS.get(client_id)!(resp);
-                }
-            );
-
-            setTimeout(() =>
-                PROTO_SERVER.poll((client_id: number, resp: Uint8Array) => {
-                    CLIENTS.get(client_id)!(resp);
-                })
-            );
-        },
-    };
-}
-
-const LOCAL_PATH = path.join(process.cwd(), "node_modules");
-
-const DEFAULT_ASSETS = [
-    "@finos/perspective-test",
-    "@finos/perspective/dist/cdn",
-    "@finos/perspective-workspace/dist/cdn",
-    "@finos/perspective-workspace/dist/css",
-    "@finos/perspective-viewer/dist/cdn",
-    "@finos/perspective-viewer/dist/css",
-    "@finos/perspective-viewer-openlayers/dist/cdn",
-    "@finos/perspective-viewer-datagrid/dist/cdn",
-    "@finos/perspective-viewer-d3fc/dist/cdn",
-    "@finos/perspective-jupyterlab/dist/cdn",
-];
 
 const CONTENT_TYPES: Record<string, string> = {
     ".js": "text/javascript",
@@ -143,18 +77,6 @@ const CONTENT_TYPES: Record<string, string> = {
     ".wasm": "application/wasm",
 };
 
-function read_promise(filePath: string) {
-    return new Promise((resolve, reject) => {
-        fs.readFile(filePath, function (error, content) {
-            if (error && error.code !== "ENOENT") {
-                reject(error);
-            } else {
-                resolve(content);
-            }
-        });
-    });
-}
-
 /**
  * Host a Perspective server that hosts data, code files, etc.
  * Strip version numbers from the URL so we can handle CDN-like requests
@@ -164,8 +86,7 @@ function read_promise(filePath: string) {
 export async function cwd_static_file_handler(
     request: http.IncomingMessage,
     response: http.ServerResponse<http.IncomingMessage>,
-    assets = ["./"],
-    hostPsp = false
+    assets = ["./"]
 ) {
     let url =
         request.url
@@ -181,63 +102,27 @@ export async function cwd_static_file_handler(
     try {
         for (const root of assets) {
             let filePath = root + url;
-            let content = await read_promise(filePath);
-            if (typeof content !== "undefined") {
-                console.log(`200 ${url}`);
-                response.writeHead(200, { "Content-Type": contentType });
-                if (extname === ".arrow" || extname === ".feather") {
-                    response.end(content, "utf-8");
-                } else {
-                    response.end(content);
-                }
-
-                return;
-            }
-        }
-
-        if (hostPsp) {
-            for (let rootDir of DEFAULT_ASSETS) {
-                try {
-                    let filePath;
-                    if (url.startsWith("/" + rootDir)) {
-                        filePath = require.resolve(url.slice(1));
+            try {
+                let content = await fs.readFile(filePath);
+                if (typeof content !== "undefined") {
+                    console.log(`200 ${url}`);
+                    response.writeHead(200, { "Content-Type": contentType });
+                    if (extname === ".arrow" || extname === ".feather") {
+                        response.end(content, "utf-8");
                     } else {
-                        let paths = require.resolve.paths(rootDir + url);
-                        paths = [
-                            ...(paths || []),
-                            ...assets.map((x) => path.join(x, "node_modules")),
-                            LOCAL_PATH,
-                        ];
-                        filePath = require.resolve(rootDir + url, {
-                            paths,
-                        });
+                        response.end(content);
                     }
-                    let content = await read_promise(filePath);
-                    if (typeof content !== "undefined") {
-                        console.log(`200 ${url}`);
-                        response.writeHead(200, {
-                            "Content-Type": contentType,
-                        });
 
-                        if (extname === ".arrow" || extname === ".feather") {
-                            response.end(content, "utf-8");
-                        } else {
-                            response.end(content);
-                        }
-
-                        return;
-                    }
-                } catch (e) {
-                    // console.log(e);
+                    return;
                 }
-            }
+            } catch (e) {}
         }
 
         console.error(`404 ${url}`);
         response.writeHead(404);
         response.end("", "utf-8");
     } catch (error) {
-        console.error(`500 ${url}`);
+        console.error(`500 ${url} ${error}`);
         response.writeHead(500);
         response.end("", "utf-8");
     }
@@ -262,31 +147,40 @@ function buffer_to_arraybuffer(
     }
 }
 
+function invert_promise<T>(): [(t: T) => void, Promise<T>] {
+    let sender: ((t: T) => void) | undefined = undefined;
+    let receiver: Promise<T> = new Promise((x) => {
+        sender = x;
+    });
+
+    return [sender!, receiver];
+}
+
 export class WebSocketServer {
     _server: http.Server | any; // stoppable has no type ...
-    _wss: WebSocket.Server;
-    constructor({ port = 8080, assets = ["./"], hostPsp = false } = {}) {
+    _wss: HttpWebSocketServer;
+    constructor({ port = 8080, assets = ["./"] } = {}) {
         port = typeof port === "undefined" ? 8080 : port;
         this._server = stoppable(
-            http.createServer((x, y) =>
-                cwd_static_file_handler(x, y, assets, hostPsp)
-            )
+            http.createServer((x, y) => cwd_static_file_handler(x, y, assets))
         );
 
-        this._wss = new WebSocket.Server({
+        this._wss = new HttpWebSocketServer({
             noServer: true,
             perMessageDeflate: true,
         });
 
         this._wss.on("connection", (ws) => {
             console.log("... Connecting websocket");
-            const server = make_server((proto: Uint8Array) => {
+            console.log("WIP3");
+            const server = SYNC_SERVER.make_session((proto: Uint8Array) => {
                 ws.send(buffer_to_arraybuffer(proto));
             });
 
-            ws.on("message", (proto) =>
-                server.handle_message(buffer_to_arraybuffer(proto))
-            );
+            ws.on("message", (proto) => {
+                server.handle_message(buffer_to_arraybuffer(proto));
+                setTimeout(() => server.poll());
+            });
         });
 
         this._server.on(
@@ -296,6 +190,7 @@ export class WebSocketServer {
                 socket: net.Socket,
                 head: Buffer
             ) => {
+                console.log("WIP2");
                 console.log("200 Websocket upgrade");
                 this._wss.handleUpgrade(
                     request,
@@ -316,20 +211,6 @@ export class WebSocketServer {
     }
 }
 
-// The sync client/server, e.g. the global Perspective instance in Node.
-let SYNC_CLIENT: perspective_client.JsClient;
-let SYNC_SERVER;
-
-SYNC_SERVER = make_server((resp) => {
-    SYNC_CLIENT.handle_message(resp);
-});
-
-SYNC_CLIENT = make_client((req) => {
-    SYNC_SERVER.handle_message(req);
-});
-
-await SYNC_CLIENT.init();
-
 export function get_hosted_table_names() {
     return SYNC_CLIENT.get_hosted_table_names();
 }
@@ -339,7 +220,7 @@ export function system_info() {
 }
 
 /**
- * Create a table from the synchronous global Perspective instance.
+ * Create a table from the global Perspective instance.
  * @param init_data
  * @param options
  * @returns

@@ -12,7 +12,10 @@
 
 // @ts-ignore
 import perspective_wasm from "../../dist/pkg/web/perspective-server.wasm";
+
+// @ts-ignore
 import perspective_wasm_worker from "../../src/ts/perspective-server.worker.js";
+
 import type * as psp from "../../dist/pkg/perspective-js.d.ts";
 
 function invert_promise<T>(): [(t: T) => void, Promise<T>] {

@@ -10,26 +10,39 @@
 #  ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 #  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-[workspace]
-resolver = "2"
-members = [
-    "rust/lint",
-    "rust/bootstrap",
-    "rust/bootstrap-runtime",
-    "rust/perspective-viewer",
-    "rust/bundle",
-    "rust/perspective-client",
-    "rust/perspective-js",
-    "rust/perspective-server",
+[package]
+name = "perspective-server"
+version = "3.0.0-alpha.1"
+authors = ["Andrew Stein <steinlink@gmail.com>"]
+edition = "2021"
+description = "A data visualization and analytics component, especially well-suited for large and/or streaming datasets."
+repository = "https://github.com/finos/perspective"
+license = "Apache-2.0"
+homepage = "https://perspective.finos.org"
+keywords = []
+build = "build.rs"
+include = [
+    "src/**/*",
+    "include/**/*",
+    "cpp/**/*",
+    "cmake/**/*",
+    "Cargo.toml",
+    "build.rs",
 ]
 
-[profile.dev]
-panic = "abort"
-opt-level = "s"
+[features]
+default = []
+external-cpp = []
 
-[profile.release]
-panic = "abort"
-opt-level = "z"
-codegen-units = 1
-lto = true
-strip = true
+[build-dependencies]
+cxx-build = "1.0.115"
+cmake = "0.1.50"
+num_cpus = "1.16.0"
+
+[dependencies]
+cxx = "1.0.115"
+tracing = { version = ">=0.1.36" }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"

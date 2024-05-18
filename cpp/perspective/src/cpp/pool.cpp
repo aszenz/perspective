@@ -30,12 +30,6 @@ t_updctx::t_updctx(t_uindex gnode_id, std::string ctx) :
 
 #if defined PSP_ENABLE_WASM && !defined PSP_ENABLE_PYTHON
 
-t_val
-empty_callback() {
-    t_val callback = t_val::global("Object").new_();
-    callback.set("_update_callback", t_val::global("Function").new_());
-    return callback;
-}
 
 t_pool::t_pool() : m_sleep(0) { m_run.clear(); }
 

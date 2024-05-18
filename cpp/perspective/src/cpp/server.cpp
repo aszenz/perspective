@@ -38,13 +38,6 @@
 #include <vector>
 #include <ctime>
 
-// TODO: Put this in its own translation unit
-// and handle platform specific details of gathering system
-// metadata.
-#ifdef PSP_ENABLE_WASM
-#include <emscripten/heap.h>
-#endif
-
 namespace perspective {
 template <>
 std::shared_ptr<t_ctxunit>
@@ -2200,10 +2193,9 @@ ProtoServer::_handle_message(std::uint32_t client_id, const Request& req) {
         case proto::Request::kServerSystemInfoReq: {
             proto::Response resp;
             auto* sys_info = resp.mutable_server_system_info_resp();
-            // TODO: Like I said above at the emscripten include,
-            // This should be abstracted to its own translation unit.
 #ifdef PSP_ENABLE_WASM
-            sys_info->set_heap_size(emscripten_get_heap_size());
+            auto heap_size = psp_heap_size();
+            sys_info->set_heap_size(heap_size);
 #else
             PSP_COMPLAIN_AND_ABORT(
                 "ServerSystemInfoReq not implemented for non-emscripten targets"

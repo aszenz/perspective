@@ -10,10 +10,10 @@
 // ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-import {
-    table,
+import perspective, {
     cwd_static_file_handler,
-    make_server,
+    make_session,
+    make_client,
 } from "@finos/perspective";
 import path from "path";
 import express from "express";
@@ -39,16 +39,18 @@ function buffer_to_arraybuffer(buffer) {
 // to create it so the WebSocket clients can find it.
 const _table = await securities.securities.getTable();
 
+// const w = await psp.worker();
 const app = expressWs(express()).app;
 app.ws("/subscribe", (ws) => {
     console.log("Connecting websocket!");
-    const server = make_server((proto) => {
+    const session = make_session((proto) => {
         ws.send(buffer_to_arraybuffer(proto));
     });
 
-    ws.on("message", (proto) =>
-        server.handle_message(buffer_to_arraybuffer(proto))
-    );
+    ws.on("message", (proto) => {
+        const x = session.handle_message(buffer_to_arraybuffer(proto));
+        return x;
+    });
 });
 
 app.use("/", (x, y) => cwd_static_file_handler(x, y, ["dist/"]));
