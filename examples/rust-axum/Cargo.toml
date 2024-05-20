@@ -10,28 +10,26 @@
 #  ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 #  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-[workspace]
-resolver = "2"
-members = [
-    "rust/lint",
-    "rust/bootstrap",
-    "rust/bootstrap-runtime",
-    "rust/perspective-viewer",
-    "rust/bundle",
-    "rust/perspective",
-    "rust/perspective-client",
-    "rust/perspective-js",
-    "rust/perspective-python",
-    "rust/perspective-server",
-]
+[package]
+name = "rust-axum"
+version = "0.1.0"
+edition = "2021"
 
-[profile.dev]
-panic = "abort"
-opt-level = "s"
-
-[profile.release]
-panic = "abort"
-opt-level = "z"
-codegen-units = 1
-lto = true
-strip = true
+[dependencies]
+perspective = { version = "2.10.1", path = "../../rust/perspective" }
+anyhow = "1.0.66"
+axum = { version = "=0.7.4", features = ["ws"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+futures = "0.3"
+futures-util = { version = "0.3", default-features = false, features = [
+    "sink",
+    "std",
+] }
+headers = "0.4"
+tokio = { version = "1.0", features = ["full"] }
+tokio-tungstenite = "0.21"
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5.0", features = ["fs", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+prost = "0.12"
