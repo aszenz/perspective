@@ -10,27 +10,22 @@
 #  ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 #  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-[workspace]
-resolver = "2"
-members = [
-    "rust/lint",
-    "rust/bootstrap",
-    "rust/bootstrap-runtime",
-    "rust/perspective-viewer",
-    "rust/bundle",
-    "rust/perspective-client",
-    "rust/perspective-js",
-    "rust/perspective-python",
-    "rust/perspective-server",
-]
+from perspective.core.globalpsp import Session
+from tornado.websocket import WebSocketHandler
 
-[profile.dev]
-panic = "abort"
-opt-level = "s"
+class PerspectiveTornadoHandler(WebSocketHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-[profile.release]
-panic = "abort"
-opt-level = "z"
-codegen-units = 1
-lto = true
-strip = true
+    def open(self):
+        async def inner(x):
+            await self.write_message(x, binary=True)
+        self.session = Session(inner)
+    
+    def on_close(self) -> None:
+        del self.session
+
+    async def on_message(self, msg: bytes):
+        if not isinstance(msg, bytes):
+            return
+        await self.session.handle_message(msg)

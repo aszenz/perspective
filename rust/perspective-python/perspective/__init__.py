@@ -10,27 +10,13 @@
 #  ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 #  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-[workspace]
-resolver = "2"
-members = [
-    "rust/lint",
-    "rust/bootstrap",
-    "rust/bootstrap-runtime",
-    "rust/perspective-viewer",
-    "rust/bundle",
-    "rust/perspective-client",
-    "rust/perspective-js",
-    "rust/perspective-python",
-    "rust/perspective-server",
-]
+__version__ = "2.9.0"
 
-[profile.dev]
-panic = "abort"
-opt-level = "s"
+from .perspective import *
+from .core.exception import PerspectiveError
 
-[profile.release]
-panic = "abort"
-opt-level = "z"
-codegen-units = 1
-lto = true
-strip = true
+
+from .legacy import PerspectiveManager, Table, PerspectiveCppError, set_threadpool_size, async_client, sync_client
+from .widget import PerspectiveWidget
+from .viewer import PerspectiveViewer
+from .handlers import PerspectiveTornadoHandler

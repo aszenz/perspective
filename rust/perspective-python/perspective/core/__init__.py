@@ -10,27 +10,4 @@
 #  ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 #  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-[workspace]
-resolver = "2"
-members = [
-    "rust/lint",
-    "rust/bootstrap",
-    "rust/bootstrap-runtime",
-    "rust/perspective-viewer",
-    "rust/bundle",
-    "rust/perspective-client",
-    "rust/perspective-js",
-    "rust/perspective-python",
-    "rust/perspective-server",
-]
-
-[profile.dev]
-panic = "abort"
-opt-level = "s"
-
-[profile.release]
-panic = "abort"
-opt-level = "z"
-codegen-units = 1
-lto = true
-strip = true
+from .exception import PerspectiveError

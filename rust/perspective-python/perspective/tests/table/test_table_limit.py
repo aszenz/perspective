@@ -10,27 +10,20 @@
 #  ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 #  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-[workspace]
-resolver = "2"
-members = [
-    "rust/lint",
-    "rust/bootstrap",
-    "rust/bootstrap-runtime",
-    "rust/perspective-viewer",
-    "rust/bundle",
-    "rust/perspective-client",
-    "rust/perspective-js",
-    "rust/perspective-python",
-    "rust/perspective-server",
-]
+from datetime import date, datetime
 
-[profile.dev]
-panic = "abort"
-opt-level = "s"
+import perspective
+from pytest import mark
 
-[profile.release]
-panic = "abort"
-opt-level = "z"
-codegen-units = 1
-lto = true
-strip = true
+
+class TestTableInfer(object):
+    def test_table_limit_wraparound_does_not_respect_partial(self):
+        t = perspective.Table({"a": "float", "b": "float"}, limit=3)
+        t.update([{"a": 10}, {"b": 1}, {"a": 20}, {"a": None, "b": 2}])
+        df = t.view().to_df()
+
+        t2 = perspective.Table({"a": "float", "b": "float"}, limit=3)
+        t2.update([{"a": 10}, {"b": 1}, {"a": 20}, {"b": 2}])
+        df2 = t2.view().to_df()
+
+        assert df.to_dict() == df2.to_dict()

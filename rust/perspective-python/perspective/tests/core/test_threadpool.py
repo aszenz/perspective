@@ -10,27 +10,32 @@
 #  ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 #  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-[workspace]
-resolver = "2"
-members = [
-    "rust/lint",
-    "rust/bootstrap",
-    "rust/bootstrap-runtime",
-    "rust/perspective-viewer",
-    "rust/bundle",
-    "rust/perspective-client",
-    "rust/perspective-js",
-    "rust/perspective-python",
-    "rust/perspective-server",
-]
+from perspective import Table, set_threadpool_size
 
-[profile.dev]
-panic = "abort"
-opt-level = "s"
 
-[profile.release]
-panic = "abort"
-opt-level = "z"
-codegen-units = 1
-lto = true
-strip = true
+def compare_delta(received, expected):
+    """Compare an arrow-serialized row delta by constructing a Table."""
+    tbl = Table(received)
+    assert tbl.view().to_dict() == expected
+
+
+class TestThreadpool(object):
+    def test_set_threadpool_size(self):
+        set_threadpool_size(1)
+        data = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+        tbl = Table(data)
+        view = tbl.view()
+        assert view.num_rows() == 2
+        assert view.num_columns() == 2
+        assert view.schema() == {"a": "integer", "b": "integer"}
+        assert view.to_records() == data
+
+    def test_set_threadpool_size_max(self):
+        set_threadpool_size(None)
+        data = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+        tbl = Table(data)
+        view = tbl.view()
+        assert view.num_rows() == 2
+        assert view.num_columns() == 2
+        assert view.schema() == {"a": "integer", "b": "integer"}
+        assert view.to_records() == data

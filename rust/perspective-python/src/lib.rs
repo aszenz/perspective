@@ -10,43 +10,58 @@
 // ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-import sh from "./sh.mjs";
-import * as url from "url";
-import * as dotenv from "dotenv";
-import * as cppLint from "./lint_cpp.mjs";
+#![feature(if_let_guard)]
+#![feature(lazy_cell)]
 
-export function lint_js(is_fix = false) {
-    const prettier_flags = is_fix ? "--write" : "--check";
-    const cmd = sh`prettier ${prettier_flags} "examples/**/*.js" "examples/**/*.tsx" "tools/perspective-scripts/*.mjs" "rust/**/*.ts" "rust/**/*.js" "packages/**/*.js" "packages/**/*.ts" "cpp/**/*.js"`;
-    cmd.sh`prettier --prose-wrap=always ${prettier_flags} "docs/docs/*.md"`;
-    cmd.sh`prettier ${prettier_flags} "**/*.yml"`;
-    cmd.sh`prettier ${prettier_flags} "**/less/*.less"`;
-    cmd.sh`prettier ${prettier_flags} "**/html/*.html"`;
-    cmd.sh`prettier ${prettier_flags} "packages/**/package.json" "rust/**/package.json" "examples/**/package.json" "docs/package.json"`;
+mod client;
 
-    const check = is_fix ? undefined : "--check";
-    const dirty = is_fix ? "--allow-dirty" : undefined;
-    const staged = is_fix ? "--allow-staged" : undefined;
-    const fix = is_fix ? "--fix" : undefined;
-    cmd.sh`cd rust/perspective-viewer`;
-    cmd.sh`cargo build -p perspective-lint --release`;
-    cmd.sh`cargo clippy ${fix} ${dirty} ${staged} -- -Dwarnings`;
-    cmd.sh`RUSTFMT="../target/release/lint" cargo fmt ${check}`;
-    cmd.runSync();
+use client::*;
+use pyo3::prelude::*;
+use pyo3_asyncio::tokio::re_exports::runtime::Builder;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{fmt, EnvFilter};
+
+/// Create a tracing filter which mimics the default behavior of reading from
+/// env, customized to exclude timestamp.
+/// [`tracing` filter docs](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/layer/index.html#per-layer-filtering)
+fn init_tracing() {
+    let fmt_layer = fmt::layer().without_time().with_target(true);
+    let filter_layer = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("debug"))
+        .unwrap();
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt_layer)
+        .init();
 }
 
-if (import.meta.url.startsWith("file:")) {
-    if (process.argv[1] === url.fileURLToPath(import.meta.url)) {
-        dotenv.config({ path: "./.perspectiverc" });
-        const { default: run } = await import("./lint_headers.mjs");
-        const exit_code = await run(false);
-        // if (process.env.PSP_PROJECT === "python") {
-        // await import("./lint_python.mjs");
-        // } else {
-        lint_js();
-        // }
-
-        cppLint.checkFormatting();
-        process.exit(exit_code);
+/// A Python module implemented in Rust.
+#[pymodule]
+fn perspective(py: Python, m: &PyModule) -> PyResult<()> {
+    init_tracing();
+    let mut builder = Builder::new_multi_thread();
+    if let Some(threads) = std::env::var("PSP_PY_WORKER_THREADS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+    {
+        builder.worker_threads(threads);
     }
+    builder.enable_all();
+    pyo3_asyncio::tokio::init(builder);
+    m.add_class::<client_async::PyAsyncClient>()?;
+    m.add_class::<client_sync::PySyncClient>()?;
+    m.add_class::<client_async::PyAsyncTable>()?;
+    m.add_class::<client_async::PyAsyncView>()?;
+    m.add_class::<client_async::PyAsyncServer>()?;
+    // m.add_class::<client::PerspectivePyError>()?;
+    m.add(
+        "PerspectiveCppError",
+        py.get_type::<client::PerspectivePyError>(),
+    )?;
+    // m.add_function(wrap_pyfunction!(init_tracing, m)?)?;
+    m.add_function(wrap_pyfunction!(client_async::create_async_client, m)?)?;
+    m.add_function(wrap_pyfunction!(client_sync::create_sync_client, m)?)?;
+    Ok(())
 }

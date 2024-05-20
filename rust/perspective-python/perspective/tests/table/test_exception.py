@@ -10,27 +10,42 @@
 #  ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 #  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-[workspace]
-resolver = "2"
-members = [
-    "rust/lint",
-    "rust/bootstrap",
-    "rust/bootstrap-runtime",
-    "rust/perspective-viewer",
-    "rust/bundle",
-    "rust/perspective-client",
-    "rust/perspective-js",
-    "rust/perspective-python",
-    "rust/perspective-server",
-]
+from pytest import raises
+from perspective import Table, PerspectiveError, PerspectiveCppError
 
-[profile.dev]
-panic = "abort"
-opt-level = "s"
 
-[profile.release]
-panic = "abort"
-opt-level = "z"
-codegen-units = 1
-lto = true
-strip = true
+class TestException(object):
+    def test_exception_from_core(self):
+        tbl = Table({"a": [1, 2, 3]})
+
+        with raises(PerspectiveCppError) as ex:
+            # creating view with unknown column should throw
+            tbl.view(group_by=["b"])
+
+        assert str(ex.value) == "Abort(): Invalid column 'b' found in View group_by.\n"
+
+    def test_exception_from_core_catch_generic(self):
+        tbl = Table({"a": [1, 2, 3]})
+        # `PerspectiveCppError` should inherit from `Exception`
+        with raises(Exception) as ex:
+            tbl.view(group_by=["b"])
+
+        assert str(ex.value) == "Abort(): Invalid column 'b' found in View group_by.\n"
+
+    def test_exception_from_core_correct_types(self):
+        tbl = Table({"a": [1, 2, 3]})
+
+        # `PerspectiveError` should be raised from the Python layer
+        with raises(PerspectiveError) as ex:
+            tbl.view()
+            tbl.delete()
+
+        assert (
+            str(ex.value)
+            == "Abort(): Cannot delete a Table with active views still linked to it - call delete() on each view, and try again."
+        )
+
+        with raises(PerspectiveCppError) as ex:
+            tbl.view(group_by=["b"])
+
+        assert str(ex.value) == "Abort(): Invalid column 'b' found in View group_by.\n"

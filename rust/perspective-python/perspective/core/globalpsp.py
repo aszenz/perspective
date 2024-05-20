@@ -10,27 +10,43 @@
 #  ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 #  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-[workspace]
-resolver = "2"
-members = [
-    "rust/lint",
-    "rust/bootstrap",
-    "rust/bootstrap-runtime",
-    "rust/perspective-viewer",
-    "rust/bundle",
-    "rust/perspective-client",
-    "rust/perspective-js",
-    "rust/perspective-python",
-    "rust/perspective-server",
-]
+from typing import Awaitable, Callable, Dict
+import perspective
 
-[profile.dev]
-panic = "abort"
-opt-level = "s"
+_psp_server = perspective.PyAsyncServer()
+_clients: Dict[str, Callable[[bytes], Awaitable[None]]] = {}
+_session_id = 0
 
-[profile.release]
-panic = "abort"
-opt-level = "z"
-codegen-units = 1
-lto = true
-strip = true
+def make_session_id():
+    global _session_id
+    new_id = _session_id
+    _session_id += 1
+    return new_id
+
+async def delegate_client(client_id: str, msg: bytes):
+    if client_id in _clients:
+        await _clients[client_id](msg)
+
+def register_session(client_id: str, fn: Callable[[bytes], Awaitable[None]]):
+    _clients[client_id] = fn
+
+def unregister_session(client_id: str):
+    del _clients[client_id]
+
+async def shared_client():
+    return await perspective.create_async_client(_psp_server)
+
+class Session:
+    def __init__(self, fn: Callable[[bytes], Awaitable[None]]):
+        self.client_id = make_session_id()
+        register_session(self.client_id, fn)
+    
+    def __del__(self):
+        unregister_session(self.client_id)
+
+    async def handle_message(self, msg: bytes):
+        await _psp_server.handle_message(self.client_id, msg, delegate_client)
+        import asyncio
+        async def poll():
+            await _psp_server.poll(delegate_client)
+        asyncio.get_event_loop().create_task(poll())
