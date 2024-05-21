@@ -105,8 +105,8 @@ async function build_all() {
 
     // "files": ["./src/ts/perspective.node.ts", "./src/ts/perspective.ts"]
     // Typecheck
-    // execSync("npx tsc --project ./tsconfig.browser.json", INHERIT);
-    // execSync("npx tsc --project ./tsconfig.browser.json", INHERIT);
+    execSync("npx tsc --project ./tsconfig.browser.json", INHERIT);
+    execSync("npx tsc --project ./tsconfig.browser.json", INHERIT);
     await cpy("target/themes/*", "dist/css");
     await cpy("target/themes/*", "dist/css");
 }

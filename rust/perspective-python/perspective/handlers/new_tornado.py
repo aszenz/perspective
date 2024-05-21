@@ -18,7 +18,8 @@ class PerspectiveTornadoHandler(WebSocketHandler):
         super().__init__(*args, **kwargs)
 
     def open(self):
-        async def inner(x):
+        async def inner(_, x):
+            print("Writing to websocket")
             await self.write_message(x, binary=True)
         self.session = Session(inner)
     

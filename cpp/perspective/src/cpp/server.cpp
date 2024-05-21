@@ -39,6 +39,8 @@
 #include <ctime>
 
 namespace perspective {
+std::uint32_t server::ProtoServer::m_client_id = 0;
+
 template <>
 std::shared_ptr<t_ctxunit>
 make_context(
@@ -615,6 +617,11 @@ ServerResources::is_table_dirty(const t_id& id) {
     return m_dirty_tables.contains(id);
 }
 
+std::uint32_t
+ProtoServer::new_session() {
+    return m_client_id++;
+}
+
 std::vector<ProtoServerResp<std::string>>
 ProtoServer::handle_message(
     std::uint32_t client_id, const std::string_view& data
@@ -661,6 +668,14 @@ ProtoServer::handle_message(
         serialized_responses.emplace_back(str_resp);
     }
 
+#ifndef PSP_ENABLE_WASM
+    for (const auto& str_resp : serialized_responses) {
+        psp_global_session_handler(
+            str_resp.client_id, str_resp.data.data(), str_resp.data.size()
+        );
+    }
+#endif
+
     return serialized_responses;
 }
 
@@ -671,6 +686,11 @@ ProtoServer::poll() {
         ProtoServerResp<std::string> str_resp;
         str_resp.data = resp.data.SerializeAsString();
         str_resp.client_id = resp.client_id;
+#ifndef PSP_ENABLE_WASM
+        psp_global_session_handler(
+            str_resp.client_id, str_resp.data.data(), str_resp.data.size()
+        );
+#endif
         out.emplace_back(str_resp);
     }
 

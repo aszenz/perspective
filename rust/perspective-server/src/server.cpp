@@ -23,6 +23,12 @@ new_proto_server() {
     return std::make_unique<ProtoApiServer>();
 }
 
+std::uint32_t
+new_session(const ProtoApiServer& self) {
+    auto& server = const_cast<ProtoApiServer&>(self);
+    return server.new_session();
+};
+
 rust::Box<ResponseBatch>
 handle_message(
     const ProtoApiServer& self,

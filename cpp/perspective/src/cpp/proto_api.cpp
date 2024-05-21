@@ -29,6 +29,11 @@ ProtoApiServer::ProtoApiServerImpl::ProtoApiServerImpl() :
     m_server(std::make_unique<perspective::server::ProtoServer>()) {}
 ProtoApiServer::ProtoApiServerImpl::~ProtoApiServerImpl() = default;
 
+std::uint32_t
+ProtoApiServer::new_session() {
+    return m_impl->m_server->new_session();
+}
+
 std::vector<ProtoApiResponse>
 ProtoApiServer::handle_message(std::uint32_t client_id, const std::string& data)
     const {

@@ -553,6 +553,8 @@ namespace server {
     public:
         using Request = perspective::proto::Request;
         using Response = perspective::proto::Response;
+
+        std::uint32_t new_session();
         std::vector<ProtoServerResp<std::string>>
         handle_message(std::uint32_t client_id, const std::string_view& data);
         std::vector<ProtoServerResp<std::string>> poll();
@@ -580,8 +582,20 @@ namespace server {
             std::vector<ProtoServerResp<Response>>& outs
         );
 
+        static std::uint32_t m_client_id;
         ServerResources m_resources;
     };
 
 } // namespace server
 } // namespace perspective
+
+#ifndef PSP_ENABLE_WASM
+
+PERSPECTIVE_EXPORT extern "C" void psp_global_session_handler(
+    std::uint32_t client_id, const char* data, std::uint32_t length
+);
+
+PERSPECTIVE_EXPORT extern "C" void
+psp_global_session_handler_cleanup(void* server);
+
+#endif

@@ -42,7 +42,7 @@ impl PySyncClient {
 /// Create a new `Client` instance with a _synchronous_, _blocking_ API.
 #[pyfunction]
 pub fn create_sync_client() -> PySyncClient {
-    PySyncClient(PyClient::new(None))
+    PySyncClient(PyClient::new(None, None))
 }
 
 #[pyclass]

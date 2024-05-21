@@ -21,6 +21,7 @@ mod ffi_internal {
         include!("server.h");
         type ProtoApiServer;
         fn new_proto_server() -> UniquePtr<ProtoApiServer>;
+        fn new_session(server: &ProtoApiServer) -> u32;
         fn handle_message(
             server: &ProtoApiServer,
             client_id: u32,

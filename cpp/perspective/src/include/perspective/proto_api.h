@@ -31,6 +31,8 @@ public:
     ProtoApiServer();
     ~ProtoApiServer();
 
+    std::uint32_t new_session();
+
     [[nodiscard]]
     std::vector<ProtoApiResponse>
     handle_message(std::uint32_t client_id, const std::string& data) const;

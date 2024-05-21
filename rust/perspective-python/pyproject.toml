@@ -17,6 +17,7 @@ build-backend = "maturin"
 [project]
 name = "perspective-python"
 requires-python = ">=3.8"
+
 dynamic = ["version"]
 classifiers = [
     "Programming Language :: Rust",

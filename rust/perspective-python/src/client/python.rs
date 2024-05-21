@@ -36,8 +36,8 @@ pub struct PyClient {
     client: Client,
 }
 
-async fn process_message(server: PerspectiveServer, client: Client, msg: Vec<u8>) {
-    let batch = server.handle_message(69, &msg);
+async fn process_message(server: PerspectiveServer, client: Client, client_id: u32, msg: Vec<u8>) {
+    let batch = server.handle_message(client_id, &msg);
     for (_client_id, response) in batch {
         client.receive(&response).unwrap()
     }
@@ -121,15 +121,17 @@ impl TableData {
 const PSP_CALLBACK_ID: &str = "__PSP_CALLBACK_ID__";
 
 impl PyClient {
-    pub fn new(server: Option<PyAsyncServer>) -> Self {
+    pub fn new(server: Option<PyAsyncServer>, client_id: Option<u32>) -> Self {
         let server = server
             .map(|x| x.server)
             .unwrap_or_else(PerspectiveServer::new);
 
+        let client_id = client_id.unwrap_or_else(|| server.new_session());
+
         let client = Client::new({
             move |client, msg| {
                 clone!(server, client, msg);
-                Box::pin(process_message(server, client, msg))
+                Box::pin(process_message(server, client, client_id, msg))
             }
         });
 

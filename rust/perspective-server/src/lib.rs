@@ -10,7 +10,12 @@
 // ┃ of the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). ┃
 // ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-use std::sync::Arc;
+#![feature(lazy_cell)]
+
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, LazyLock, RwLock};
 
 use cxx::UniquePtr;
 
@@ -21,6 +26,8 @@ pub struct PerspectiveServer {
     server: Arc<UniquePtr<ffi::ProtoApiServer>>,
 }
 
+pub type SessionCallback = Arc<dyn Fn(u32, &Vec<u8>) + 'static + Sync + Send>;
+
 impl Default for PerspectiveServer {
     fn default() -> Self {
         let server = Arc::new(ffi::new_proto_server());
@@ -28,9 +35,50 @@ impl Default for PerspectiveServer {
     }
 }
 
+static CALLBACKS: LazyLock<RwLock<HashMap<u32, SessionCallback>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+#[no_mangle]
+pub extern "C" fn psp_global_session_handler(client_id: u32, data: *const u8, length: u32) {
+    let data = unsafe { std::slice::from_raw_parts(data, length as usize) };
+    let data_vec = data.to_owned();
+    // Print process and thread id
+    let thread_id = std::thread::current().id();
+    let process_id = std::process::id();
+    tracing::info!(
+        "Global session handler called for client_id: {}, thread_id: {:?}, process_id: {}",
+        client_id,
+        thread_id,
+        process_id
+    );
+    let cb = CALLBACKS.read().expect("lock poisoned");
+    if let Some(cb) = cb.get(&client_id) {
+        cb(client_id, &data_vec);
+    } else {
+        tracing::info!("No callback found for client_id: {}", client_id);
+    }
+}
+
 impl PerspectiveServer {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn new_session(&self) -> u32 {
+        ffi::new_session(&self.server)
+    }
+
+    pub fn register_session_cb(&mut self, cb: SessionCallback) -> u32 {
+        let client_id = ffi::new_session(&self.server);
+        tracing::info!("Registering session callback for client_id: {}", client_id);
+        // let cbs = CALLBACKS;
+        CALLBACKS.write().expect("lock poisoned").insert(client_id, cb);
+        client_id
+    }
+
+    pub fn unregister_session_cb(&mut self, client_id: u32) {
+        // let cbs = CALLBACKS;
+        CALLBACKS.write().expect("lock poisoned").remove(&client_id);
     }
 
     pub fn handle_message(

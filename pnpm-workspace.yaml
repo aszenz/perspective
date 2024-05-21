@@ -14,5 +14,6 @@ packages:
     - "rust/perspective-js"
     - "rust/perspective-viewer"
     - "rust/perspective-python"
+    - "rust/perspective-python/bench/tornado/server"
     - "examples/*"
     - "docs"

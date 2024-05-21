@@ -33,20 +33,21 @@ def register_session(client_id: str, fn: Callable[[bytes], Awaitable[None]]):
 def unregister_session(client_id: str):
     del _clients[client_id]
 
+# cid = _psp_server.register_session(lambda *args, **kwargs: print("shared_session", args, kwargs))
 async def shared_client():
     return await perspective.create_async_client(_psp_server)
 
 class Session:
     def __init__(self, fn: Callable[[bytes], Awaitable[None]]):
-        self.client_id = make_session_id()
-        register_session(self.client_id, fn)
+        self.client_id = _psp_server.register_session(fn)
     
     def __del__(self):
-        unregister_session(self.client_id)
+        _psp_server.unregister_session(self.client_id)
 
     async def handle_message(self, msg: bytes):
-        await _psp_server.handle_message(self.client_id, msg, delegate_client)
-        import asyncio
-        async def poll():
-            await _psp_server.poll(delegate_client)
-        asyncio.get_event_loop().create_task(poll())
+        await _psp_server.handle_message(self.client_id, msg)
+        _psp_server.poll()
+        # import asyncio
+        # async def poll():
+        #     await _psp_server.poll()
+        # asyncio.get_event_loop().create_task(poll())

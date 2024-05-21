@@ -20,6 +20,8 @@ struct ResponseBatch;
 
 std::unique_ptr<ProtoApiServer> new_proto_server();
 
+std::uint32_t new_session(const ProtoApiServer& self);
+
 rust::Box<ResponseBatch> handle_message(
     const ProtoApiServer& self,
     std::uint32_t client_id,

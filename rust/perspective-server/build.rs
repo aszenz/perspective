@@ -44,6 +44,10 @@ fn cmake_build() -> Result<(), std::io::Error> {
         let root_dir = Path::new(root_dir_env.as_str());
         copy_dir_all(Path::join(root_dir, "cpp"), "cpp", &HashSet::from(["dist"]))?;
         copy_dir_all(Path::join(root_dir, "cmake"), "cmake", &HashSet::new())?;
+        println!(
+            "cargo:rerun-if-changed={}/cpp/perspective",
+            root_dir.display()
+        );
     }
 
     let mut dst = Config::new("cpp/perspective");
