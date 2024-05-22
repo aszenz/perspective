@@ -71,13 +71,14 @@ impl PerspectiveServer {
     pub fn register_session_cb(&mut self, cb: SessionCallback) -> u32 {
         let client_id = ffi::new_session(&self.server);
         tracing::info!("Registering session callback for client_id: {}", client_id);
-        // let cbs = CALLBACKS;
-        CALLBACKS.write().expect("lock poisoned").insert(client_id, cb);
+        CALLBACKS
+            .write()
+            .expect("lock poisoned")
+            .insert(client_id, cb);
         client_id
     }
 
     pub fn unregister_session_cb(&mut self, client_id: u32) {
-        // let cbs = CALLBACKS;
         CALLBACKS.write().expect("lock poisoned").remove(&client_id);
     }
 

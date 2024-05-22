@@ -39,7 +39,7 @@
 #include <ctime>
 
 namespace perspective {
-std::uint32_t server::ProtoServer::m_client_id = 0;
+std::uint32_t server::ProtoServer::m_client_id = 1;
 
 template <>
 std::shared_ptr<t_ctxunit>

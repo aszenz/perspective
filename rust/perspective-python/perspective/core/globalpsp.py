@@ -39,15 +39,16 @@ async def shared_client():
 
 class Session:
     def __init__(self, fn: Callable[[bytes], Awaitable[None]]):
-        self.client_id = _psp_server.register_session(fn)
+        self.on_send(fn)
     
+    def on_send(self, fn: Callable[[bytes], Awaitable[None]]):
+        self.client_id = _psp_server.global_session_dispatcher(fn)
+
     def __del__(self):
-        _psp_server.unregister_session(self.client_id)
+        _psp_server.cleanup_session_id(self.client_id)
 
     async def handle_message(self, msg: bytes):
         await _psp_server.handle_message(self.client_id, msg)
+
+    def poll(self):
         _psp_server.poll()
-        # import asyncio
-        # async def poll():
-        #     await _psp_server.poll()
-        # asyncio.get_event_loop().create_task(poll())

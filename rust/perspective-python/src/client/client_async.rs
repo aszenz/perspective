@@ -135,7 +135,7 @@ impl PyAsyncServer {
         Self::default()
     }
 
-    pub fn register_session(&mut self, py: Python, response_cb: Py<PyFunction>) -> u32 {
+    pub fn global_session_dispatcher(&mut self, py: Python, response_cb: Py<PyFunction>) -> u32 {
         let python_context =
             pyo3_asyncio::tokio::get_current_locals(py).expect("No Python context");
         let client_id = self
@@ -163,7 +163,7 @@ impl PyAsyncServer {
         client_id
     }
 
-    pub fn unregister_session(&mut self, client_id: u32) {
+    pub fn cleanup_session_id(&mut self, client_id: u32) {
         self.server.unregister_session_cb(client_id);
     }
 

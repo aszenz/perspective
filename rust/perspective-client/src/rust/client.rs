@@ -147,7 +147,7 @@ impl Client {
     /// Handle a message from the external message queue.
     pub fn receive(&self, msg: &Vec<u8>) -> Result<(), ClientError> {
         let msg = Response::decode(msg.as_slice())?;
-        // tracing::info!("RECV {:?}", msg);
+        tracing::info!("RECV {:?}", msg);
         let payload = msg.client_resp.ok_or(ClientError::Option)?;
         let mut wr = self.subscriptions_once.try_write().unwrap();
         if let Some(handler) = (*wr).remove(&msg.msg_id) {
