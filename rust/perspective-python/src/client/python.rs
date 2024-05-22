@@ -34,6 +34,7 @@ use crate::client_async::PyAsyncServer;
 #[derive(Clone)]
 pub struct PyClient {
     client: Client,
+    loop_cb: Option<Py<PyFunction>>,
 }
 
 async fn process_message(server: PerspectiveServer, client: Client, client_id: u32, msg: Vec<u8>) {
@@ -121,7 +122,11 @@ impl TableData {
 const PSP_CALLBACK_ID: &str = "__PSP_CALLBACK_ID__";
 
 impl PyClient {
-    pub fn new(server: Option<PyAsyncServer>, client_id: Option<u32>) -> Self {
+    pub fn new(
+        server: Option<PyAsyncServer>,
+        client_id: Option<u32>,
+        loop_cb: Option<Py<PyFunction>>,
+    ) -> Self {
         let server = server
             .map(|x| x.server)
             .unwrap_or_else(PerspectiveServer::new);
@@ -135,7 +140,7 @@ impl PyClient {
             }
         });
 
-        PyClient { client }
+        PyClient { client, loop_cb }
     }
 
     pub async fn init(&self) -> PyResult<()> {
@@ -150,6 +155,7 @@ impl PyClient {
         name: Option<Py<PyString>>,
     ) -> PyResult<PyTable> {
         let client = self.client.clone();
+        let py_client = self.clone();
         let table = Python::with_gil(|py| {
             let mut options = TableInitOptions::default();
             options.name = name.map(|x| x.extract::<String>(py)).transpose()?;
@@ -172,14 +178,17 @@ impl PyClient {
         let table = table.await.into_pyerr()?;
         Ok(PyTable {
             table: Arc::new(Mutex::new(table)),
+            client: py_client,
         })
     }
 
     pub async fn open_table(&self, name: String) -> PyResult<PyTable> {
         let client = self.client.clone();
+        let py_client = self.clone();
         let table = client.open_table(name).await.into_pyerr()?;
         Ok(PyTable {
             table: Arc::new(Mutex::new(table)),
+            client: py_client,
         })
     }
 }
@@ -187,6 +196,7 @@ impl PyClient {
 #[derive(Clone)]
 pub struct PyTable {
     table: Arc<Mutex<Table>>,
+    client: PyClient,
 }
 
 assert_table_api!(PyTable);
@@ -221,11 +231,19 @@ impl PyTable {
     }
 
     pub async fn on_delete(&self, callback_py: Py<PyFunction>) -> PyResult<u32> {
+        let loop_cb = self.client.loop_cb.clone();
         let callback = {
             let callback_py = callback_py.clone();
             Box::new(move || {
-                Python::with_gil(|py| callback_py.call0(py))
-                    .expect("`on_delete()` callback failed");
+                Python::with_gil(|py| {
+                    if let Some(loop_cb) = loop_cb.as_ref() {
+                        loop_cb.call1(py, (&callback_py,))?;
+                    } else {
+                        callback_py.call0(py)?;
+                    }
+                    Ok(()) as PyResult<()>
+                })
+                .expect("`on_delete()` callback failed");
             })
         };
 
@@ -306,6 +324,7 @@ impl PyTable {
         let view = self.table.lock().await.view(config).await.into_pyerr()?;
         Ok(PyView {
             view: Arc::new(Mutex::new(view)),
+            client: self.client.clone(),
         })
     }
 }
@@ -313,6 +332,7 @@ impl PyTable {
 #[derive(Clone)]
 pub struct PyView {
     view: Arc<Mutex<View>>,
+    client: PyClient,
 }
 
 assert_view_api!(PyView);
@@ -373,9 +393,17 @@ impl PyView {
     pub async fn on_delete(&self, callback_py: Py<PyFunction>) -> PyResult<u32> {
         let callback = {
             let callback_py = callback_py.clone();
+            let loop_cb = self.client.loop_cb.clone();
             Box::new(move || {
-                Python::with_gil(|py| callback_py.call0(py))
-                    .expect("`on_delete()` callback failed");
+                let loop_cb = loop_cb.clone();
+                Python::with_gil(|py| {
+                    if let Some(loop_cb) = loop_cb.as_ref() {
+                        loop_cb.call1(py, (&callback_py,))
+                    } else {
+                        callback_py.call0(py)
+                    }
+                })
+                .expect("`on_delete()` callback failed");
             })
         };
 
@@ -402,49 +430,30 @@ impl PyView {
     }
 
     pub async fn on_update(&self, callback: Py<PyFunction>, mode: Option<String>) -> PyResult<u32> {
+        let loop_cb = self.client.loop_cb.clone();
+        println!("loop_cb: {:?}", loop_cb);
         let callback = Box::new(move |x: OnUpdateArgs| {
             let aggregate_errors: PyResult<()> = {
                 let callback = callback.clone();
                 Python::with_gil(|py| {
-                    let is_coroutine = py
-                        .import("asyncio")?
-                        .getattr("iscoroutinefunction")?
-                        .call1((&callback,))?
-                        .downcast::<pyo3::types::PyBool>()?
-                        .is_true();
-                    let fut = if let Some(x) = &x.delta {
-                        if is_coroutine {
-                            callback.call1(py, (PyBytes::new(py, x),))?
+                    if let Some(x) = &x.delta {
+                        if let Some(loop_cb) = loop_cb.as_ref() {
+                            loop_cb.call1(py, (callback, PyBytes::new(py, x)))?;
                         } else {
-                            py.import("asyncio")?
-                                .getattr("to_thread")?
-                                .call1((callback, PyBytes::new(py, x)))?
-                                .into_py(py)
+                            callback.call1(py, (PyBytes::new(py, x),))?;
                         }
-                    } else if is_coroutine {
-                        callback.call0(py)?
                     } else {
-                        py.import("asyncio")?
-                            .getattr("to_thread")?
-                            .call1((callback,))?
-                            .into_py(py)
-                    };
-
-                    let python_context = pyo3_asyncio::tokio::get_current_locals(py)?;
-                    // Somehow this seems to be eagerly executing the future anyways....
-                    let rust_future =
-                        pyo3_asyncio::into_future_with_locals(&python_context, fut.as_ref(py))?;
-
-                    // This actually just getting the result that has already
-                    // been calculated, not polling it to completion like a regular
-                    // rust future.
-                    py.allow_threads(move || {
-                        pyo3_asyncio::tokio::get_runtime().spawn(rust_future);
-                    });
+                        if let Some(loop_cb) = loop_cb.as_ref() {
+                            loop_cb.call1(py, (callback,))?;
+                        } else {
+                            callback.call0(py)?;
+                        }
+                    }
 
                     Ok(())
                 })
             };
+
             if let Err(err) = aggregate_errors {
                 tracing::warn!("Error in on_update callback: {:?}", err);
             }

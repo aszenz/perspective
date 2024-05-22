@@ -147,7 +147,7 @@ impl Client {
     /// Handle a message from the external message queue.
     pub fn receive(&self, msg: &Vec<u8>) -> Result<(), ClientError> {
         let msg = Response::decode(msg.as_slice())?;
-        tracing::info!("RECV {:?}", msg);
+        // tracing::info!("RECV {:?}", msg);
         let payload = msg.client_resp.ok_or(ClientError::Option)?;
         let mut wr = self.subscriptions_once.try_write().unwrap();
         if let Some(handler) = (*wr).remove(&msg.msg_id) {
@@ -316,6 +316,33 @@ impl Client {
         }
     }
 }
+
+// type SyncCallback = Box<dyn Fn(&Client, &Request) + Send + Sync + 'static>;
+
+// pub struct SyncClient {
+//     features: Arc<Mutex<Option<Features>>>,
+//     send: SyncCallback,
+//     id_gen: Arc<AtomicU32>,
+//     subscriptions_once: Subscriptions<OnceCallback>,
+//     subscriptions_many: Subscriptions<ManyCallback>,
+// }
+
+// impl SyncClient {
+//     pub fn new<T>(send_handler: T) -> Self
+//     where
+//         T: Fn(&Client, &Vec<u8>) + Send + Sync + 'static + Clone,
+//     {
+//         SyncClient {
+//             id_gen: Arc::new(AtomicU32::new(1)),
+//             features: Arc::default(),
+//             subscriptions_once: Arc::default(),
+//             subscriptions_many: Subscriptions::default(),
+//             send: Box::new(move |client, msg| {
+//                 send_handler(client, &encode(msg));
+//             }),
+//         }
+//     }
+// }
 
 fn replace(x: Data) -> Data {
     match x {

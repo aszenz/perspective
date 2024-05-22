@@ -127,38 +127,27 @@ impl Default for PyAsyncServer {
     }
 }
 
+impl PyAsyncServer {
+    pub fn new<F, E>(executor: Py<PyFunction>) -> Self {
+        Self::default()
+    }
+}
+
 #[allow(non_local_definitions)]
 #[pymethods]
 impl PyAsyncServer {
-    #[new]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn global_session_dispatcher(&mut self, py: Python, response_cb: Py<PyFunction>) -> u32 {
-        let python_context =
-            pyo3_asyncio::tokio::get_current_locals(py).expect("No Python context");
+        // let python_context =
+        //     pyo3_asyncio::tokio::get_current_locals(py).expect("No Python context");
         let client_id = self
             .server
             .register_session_cb(Arc::new(move |client_id, resp| {
                 let cb = response_cb.clone();
                 let resp = resp.clone();
-                let python_context = python_context.clone();
-                pyo3_asyncio::tokio::get_runtime().spawn(async move {
-                    let res: PyResult<_> = Python::with_gil(move |py| {
-                        let mut outs = vec![];
-                        let fut = cb.call1(py, (client_id, PyBytes::new(py, &resp)))?;
-                        let rust_future =
-                            pyo3_asyncio::into_future_with_locals(&python_context, fut.as_ref(py))?;
-                        outs.push(pyo3_asyncio::tokio::get_runtime().spawn(rust_future));
-                        Ok(outs)
-                    });
-                    for out in res.expect("Failed to call response callback") {
-                        out.await
-                            .expect("Failed joining future")
-                            .expect("Failed to join future");
-                    }
-                });
+                // let python_context = python_context.clone();
+                let res: PyResult<_> =
+                    Python::with_gil(move |py| cb.call1(py, (client_id, PyBytes::new(py, &resp))));
+                res.expect("Failed to call response callback");
             }));
         client_id
     }
@@ -240,7 +229,7 @@ pub fn create_async_client(
     });
 
     future_into_py(py, async move {
-        Ok(PyAsyncClient(PyClient::new(server, client_id)))
+        Ok(PyAsyncClient(PyClient::new(server, client_id, None)))
     })
 }
 

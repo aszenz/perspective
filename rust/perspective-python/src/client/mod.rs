@@ -12,6 +12,7 @@
 
 pub mod client_async;
 pub mod client_sync;
+// pub mod client_new_sync;
 mod python;
 
 pub use python::PerspectivePyError;

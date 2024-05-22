@@ -41,8 +41,9 @@ impl PySyncClient {
 
 /// Create a new `Client` instance with a _synchronous_, _blocking_ API.
 #[pyfunction]
-pub fn create_sync_client() -> PySyncClient {
-    PySyncClient(PyClient::new(None, None))
+#[pyo3(text_signature = "(loop_cb=None)")]
+pub fn create_sync_client(loop_cb: Option<Py<PyFunction>>) -> PySyncClient {
+    PySyncClient(PyClient::new(None, None, loop_cb))
 }
 
 #[pyclass]
